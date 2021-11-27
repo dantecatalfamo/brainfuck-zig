@@ -1,6 +1,8 @@
 const std = @import("std");
 const allocator = std.heap.page_allocator;
 
+const memory_size = 30_000;
+
 pub fn main() anyerror!void {
     const args = try std.process.argsAlloc(allocator);
     defer std.process.argsFree(allocator, args);
@@ -23,7 +25,7 @@ pub fn interpret(program: []const u8) anyerror!void {
     const stdin = std.io.getStdIn().reader();
     const stdout = std.io.getStdOut().writer();
 
-    var memory = [_]i32{0} ** 30_000;
+    var memory = [_]i32{0} ** memory_size;
     var index: u32 = 0;
     var program_counter: u32 = 0;
 
@@ -32,9 +34,11 @@ pub fn interpret(program: []const u8) anyerror!void {
 
         switch(character) {
             '>' => {
+                if (index == memory_size - 1) { return error.IndexOutOfBounds; }
                 index += 1;
             },
             '<' => {
+                if (index == 0) { return error.IndexOutOfBounds; }
                 index -=1 ;
             },
             '+' => {
@@ -113,4 +117,16 @@ test "get cell bit width brainfuck" {
     ;
     std.debug.print("\n", .{});
     try interpret(program);
+}
+
+test "write in cell outside of array bottom" {
+    const program = "<<<+";
+    const output = interpret(program);
+    try std.testing.expectError(error.IndexOutOfBounds, output);
+}
+
+test "write in cell outside of array top" {
+    const program = ">" ** memory_size;
+    const output = interpret(program);
+    try std.testing.expectError(error.IndexOutOfBounds, output);
 }
