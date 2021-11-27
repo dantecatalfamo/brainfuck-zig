@@ -14,6 +14,8 @@ pub fn main() anyerror!void {
     const file_path = args[1];
 
     const program = try std.fs.cwd().readFileAlloc(allocator, file_path, 1024 * 1024 * 1024);
+    defer allocator.free(program);
+
     try interpret(program);
 }
 
@@ -21,7 +23,7 @@ pub fn interpret(program: []const u8) anyerror!void {
     const stdin = std.io.getStdIn().reader();
     const stdout = std.io.getStdOut().writer();
 
-    var memory = [_]u32{0} ** 30_000;
+    var memory = [_]i32{0} ** 30_000;
     var index: u32 = 0;
     var program_counter: u32 = 0;
 
@@ -30,38 +32,25 @@ pub fn interpret(program: []const u8) anyerror!void {
 
         switch(character) {
             '>' => {
-                try stdout.print(">", .{});
                 index += 1;
-                program_counter += 1;
             },
             '<' => {
-                try stdout.print("<", .{});
                 index -=1 ;
-                program_counter += 1;
             },
             '+' => {
-                try stdout.print("+", .{});
                 memory[index] += 1;
-                program_counter += 1;
             },
             '-' => {
-                try stdout.print("-", .{});
                 memory[index] -= 1;
-                program_counter += 1;
             },
             '.' => {
-                try stdout.print(".", .{});
-                const out_byte = @truncate(u8, memory[index]);
+                const out_byte = @truncate(u8, @intCast(u32, memory[index]));
                 try stdout.writeByte(out_byte);
-                program_counter += 1;
             },
             ',' => {
-                try stdout.print(",", .{});
-                memory[index] = try stdin.readByte();
-                program_counter += 1;
+                memory[index] = stdin.readByte() catch 0;
             },
             '[' => {
-                try stdout.print("[", .{});
                 if (memory[index] == 0) {
                     var depth: u32 = 1;
                     while (program_counter < program.len) {
@@ -78,11 +67,9 @@ pub fn interpret(program: []const u8) anyerror!void {
                         }
                     }
                 }
-                program_counter += 1;
             },
             ']' => {
-                try stdout.print("]", .{});
-                if (memory[index] == 0) {
+                if (memory[index] != 0) {
                     var depth: u32 = 1;
                     while (program_counter >= 0) {
                         program_counter -= 1;
@@ -98,11 +85,9 @@ pub fn interpret(program: []const u8) anyerror!void {
                         }
                     }
                 }
-                program_counter += 1;
             },
-            else => {
-                program_counter += 1;
-            }
+            else => { }
         }
+        program_counter += 1;
     }
 }
