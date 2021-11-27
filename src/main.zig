@@ -8,7 +8,7 @@ pub fn main() anyerror!void {
     const stderr = std.io.getStdErr().writer();
 
     if (args.len != 2) {
-        try stderr.print("usage: brainfuck-zig <file path>\n", .{});
+        try stderr.print("usage: brainfuck <file path>\n", .{});
         std.os.exit(1);
     }
     const file_path = args[1];
