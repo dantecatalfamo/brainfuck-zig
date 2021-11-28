@@ -48,7 +48,7 @@ pub fn interpret(program: []const u8) anyerror!void {
                 memory[index] -= 1;
             },
             '.' => {
-                const out_byte = @truncate(u8, @intCast(u32, memory[index]));
+                const out_byte = @truncate(u8, @bitCast(u32, memory[index]));
                 try stdout.writeByte(out_byte);
             },
             ',' => {
@@ -129,4 +129,14 @@ test "write in cell outside of array top" {
     const program = ">" ** memory_size;
     const output = interpret(program);
     try std.testing.expectError(error.IndexOutOfBounds, output);
+}
+
+test "write number over 255 to stdout" {
+    const program = "+" ** 300 ++ ".";
+    const output = try interpret(program);
+}
+
+test "write negative number to stdout" {
+    const program = "-" ** 200 ++ ".";
+    const output = try interpret(program);
 }
