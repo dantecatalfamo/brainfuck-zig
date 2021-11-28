@@ -10,16 +10,20 @@ pub fn main() anyerror!void {
 
     const stderr = std.io.getStdErr().writer();
 
-    if (args.len != 2) {
-        try stderr.print("usage: brainfuck <file path>\n", .{});
+    if (args.len != 2 and args.len != 3) {
+        try stderr.print("usage: brainfuck [-e expression] [file path]\n", .{});
         std.os.exit(1);
     }
-    const file_path = args[1];
 
-    const program = try std.fs.cwd().readFileAlloc(allocator, file_path, 1024 * 1024 * 1024);
-    defer allocator.free(program);
-
-    try interpret(program);
+    if (std.mem.eql(u8, args[1], "-e")) {
+        const program = args[2];
+        interpret(program) catch std.os.exit(1);
+    } else {
+        const file_path = args[1];
+        const program = try std.fs.cwd().readFileAlloc(allocator, file_path, 1024 * 1024 * 1024);
+        defer allocator.free(program);
+        interpret(program) catch std.os.exit(1);
+    }
 }
 
 pub fn interpret(program: []const u8) anyerror!void {
@@ -36,11 +40,17 @@ pub fn interpret(program: []const u8) anyerror!void {
 
         switch(character) {
             '>' => {
-                if (index == memory_size - 1) { return error.IndexOutOfBounds; }
+                if (index == memory_size - 1) {
+                    try stderr.print("Error: index out of upper bounds at char {d}\n", .{ program_counter });
+                    return error.IndexOutOfBounds;
+                }
                 index += 1;
             },
             '<' => {
-                if (index == 0) { return error.IndexOutOfBounds; }
+                if (index == 0) {
+                    try stderr.print("Error: index out of lower bounds at char {d}\n", .{ program_counter });
+                    return error.IndexOutOfBounds;
+                }
                 index -=1 ;
             },
             '+' => {
