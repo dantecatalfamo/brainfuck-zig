@@ -25,6 +25,7 @@ pub fn main() anyerror!void {
 pub fn interpret(program: []const u8) anyerror!void {
     const stdin = std.io.getStdIn().reader();
     const stdout = std.io.getStdOut().writer();
+    const stderr = std.io.getStdErr().writer();
 
     var memory = [_]i32{0} ** memory_size;
     var index: u32 = 0;
@@ -57,6 +58,7 @@ pub fn interpret(program: []const u8) anyerror!void {
             },
             '[' => {
                 if (memory[index] == 0) {
+                    const start = program_counter;
                     var depth: u32 = 1;
                     while (program_counter < program.len - 1) {
                         program_counter += 1;
@@ -72,12 +74,14 @@ pub fn interpret(program: []const u8) anyerror!void {
                         }
                     }
                     if (program_counter == program.len - 1 and depth != 0) {
+                        try stderr.print("Error: missing closing braket to opening bracket at char {d}\n", .{ start });
                         return error.MissingClosingBracket;
                     }
                 }
             },
             ']' => {
                 if (memory[index] != 0) {
+                    const start = program_counter;
                     var depth: u32 = 1;
                     while (program_counter > 0) {
                         program_counter -= 1;
@@ -93,6 +97,7 @@ pub fn interpret(program: []const u8) anyerror!void {
                         }
                     }
                     if (program_counter == 0 and depth != 0) {
+                        try stderr.print("Error: missing opening bracket to closing bracket at char {d}\n", .{ start });
                         return error.MissingOpeningBracket;
                     }
                 }
@@ -141,11 +146,13 @@ test "write in cell outside of array top" {
 test "write number over 255 to stdout" {
     const program = "+" ** 300 ++ ".";
     try interpret(program);
+    std.debug.print("\n", .{});
 }
 
 test "write negative number to stdout" {
     const program = "-" ** 200 ++ ".";
     try interpret(program);
+    std.debug.print("\n", .{});
 }
 
 test "loop without end" {
