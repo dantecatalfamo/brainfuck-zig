@@ -1,4 +1,5 @@
 const std = @import("std");
+const testing = std.testing;
 const allocator = std.heap.page_allocator;
 
 const memory_size = 30_000;
@@ -57,7 +58,7 @@ pub fn interpret(program: []const u8) anyerror!void {
             '[' => {
                 if (memory[index] == 0) {
                     var depth: u32 = 1;
-                    while (program_counter < program.len) {
+                    while (program_counter < program.len - 1) {
                         program_counter += 1;
                         const seek_char = program[program_counter];
                         if (seek_char == ']') {
@@ -70,12 +71,15 @@ pub fn interpret(program: []const u8) anyerror!void {
                             depth += 1;
                         }
                     }
+                    if (program_counter == program.len - 1 and depth != 0) {
+                        return error.MissingClosingBracket;
+                    }
                 }
             },
             ']' => {
                 if (memory[index] != 0) {
                     var depth: u32 = 1;
-                    while (program_counter >= 0) {
+                    while (program_counter > 0) {
                         program_counter -= 1;
                         const seek_char = program[program_counter];
                         if (seek_char == '[') {
@@ -87,6 +91,9 @@ pub fn interpret(program: []const u8) anyerror!void {
                         if (seek_char == ']') {
                             depth += 1;
                         }
+                    }
+                    if (program_counter == 0 and depth != 0) {
+                        return error.MissingOpeningBracket;
                     }
                 }
             },
@@ -122,21 +129,33 @@ test "get cell bit width brainfuck" {
 test "write in cell outside of array bottom" {
     const program = "<<<+";
     const output = interpret(program);
-    try std.testing.expectError(error.IndexOutOfBounds, output);
+    try testing.expectError(error.IndexOutOfBounds, output);
 }
 
 test "write in cell outside of array top" {
     const program = ">" ** memory_size;
     const output = interpret(program);
-    try std.testing.expectError(error.IndexOutOfBounds, output);
+    try testing.expectError(error.IndexOutOfBounds, output);
 }
 
 test "write number over 255 to stdout" {
     const program = "+" ** 300 ++ ".";
-    const output = try interpret(program);
+    try interpret(program);
 }
 
 test "write negative number to stdout" {
     const program = "-" ** 200 ++ ".";
-    const output = try interpret(program);
+    try interpret(program);
+}
+
+test "loop without end" {
+    const program = "[><";
+    const output = interpret(program);
+    try testing.expectError(error.MissingClosingBracket, output);
+}
+
+test "loop without beginning" {
+    const program = "+><]";
+    const output = interpret(program);
+    try testing.expectError(error.MissingOpeningBracket, output);
 }
