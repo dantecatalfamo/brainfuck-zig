@@ -42,10 +42,10 @@ pub fn interpret(program: []const u8) anyerror!void {
                 index -=1 ;
             },
             '+' => {
-                memory[index] += 1;
+                memory[index] +%= 1;
             },
             '-' => {
-                memory[index] -= 1;
+                memory[index] -%= 1;
             },
             '.' => {
                 const out_byte = @truncate(u8, @bitCast(u32, memory[index]));
