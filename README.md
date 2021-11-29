@@ -4,4 +4,4 @@ Zig brainfuck interpreter.
 
 ## Usage
 
-`usage: brainfuck <file path>`
+`usage: brainfuck [-e expression] [file path]`
