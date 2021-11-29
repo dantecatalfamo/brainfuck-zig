@@ -10,17 +10,20 @@ pub fn main() anyerror!void {
 
     const stderr = std.io.getStdErr().writer();
 
-    if (args.len != 2 and args.len != 3) {
+    if (args.len != 2 and !(args.len == 3 and std.mem.eql(u8, args[1], "-e"))) {
         try stderr.print("usage: brainfuck [-e expression] [file path]\n", .{});
         std.os.exit(1);
     }
 
-    if (std.mem.eql(u8, args[1], "-e")) {
+    if (args.len == 3) {
         const program = args[2];
         interpret(program) catch std.os.exit(1);
-    } else {
+    } else if (args.len == 2) {
         const file_path = args[1];
-        const program = try std.fs.cwd().readFileAlloc(allocator, file_path, 1024 * 1024 * 1024);
+        const program = std.fs.cwd().readFileAlloc(allocator, file_path, 1024 * 1024 * 1024) catch {
+            try stderr.print("File not found: {s}\n", .{ file_path });
+            std.os.exit(1);
+        };
         defer allocator.free(program);
         interpret(program) catch std.os.exit(1);
     }
