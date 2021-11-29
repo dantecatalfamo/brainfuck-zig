@@ -3,6 +3,7 @@ const testing = std.testing;
 const allocator = std.heap.page_allocator;
 
 const memory_size = 30_000;
+const max_file_size = 1024 * 1024 * 1024;
 
 pub fn main() anyerror!void {
     const args = try std.process.argsAlloc(allocator);
@@ -20,7 +21,7 @@ pub fn main() anyerror!void {
         interpret(program) catch std.os.exit(1);
     } else if (args.len == 2) {
         const file_path = args[1];
-        const program = std.fs.cwd().readFileAlloc(allocator, file_path, 1024 * 1024 * 1024) catch {
+        const program = std.fs.cwd().readFileAlloc(allocator, file_path, max_file_size) catch {
             try stderr.print("File not found: {s}\n", .{ file_path });
             std.os.exit(1);
         };
