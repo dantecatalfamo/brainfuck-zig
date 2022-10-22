@@ -9,6 +9,8 @@ pub fn main() anyerror!void {
     const args = try std.process.argsAlloc(allocator);
     defer std.process.argsFree(allocator, args);
 
+    const stdin = std.io.getStdIn().reader();
+    const stdout = std.io.getStdOut().writer();
     const stderr = std.io.getStdErr().writer();
 
     if (args.len != 2 and !(args.len == 3 and std.mem.eql(u8, args[1], "-e"))) {
@@ -18,7 +20,7 @@ pub fn main() anyerror!void {
 
     if (args.len == 3) {
         const program = args[2];
-        interpret(program) catch std.os.exit(1);
+        interpret(program, stdin, stdout, stderr) catch std.os.exit(1);
     } else if (args.len == 2) {
         const file_path = args[1];
         const program = std.fs.cwd().readFileAlloc(allocator, file_path, max_file_size) catch {
@@ -26,15 +28,11 @@ pub fn main() anyerror!void {
             std.os.exit(1);
         };
         defer allocator.free(program);
-        interpret(program) catch std.os.exit(1);
+        interpret(program, stdin, stdout, stderr) catch std.os.exit(1);
     }
 }
 
-pub fn interpret(program: []const u8) anyerror!void {
-    const stdin = std.io.getStdIn().reader();
-    const stdout = std.io.getStdOut().writer();
-    const stderr = std.io.getStdErr().writer();
-
+pub fn interpret(program: []const u8, reader: anytype, writer: anytype, error_writer: anytype) anyerror!void {
     var memory = [_]i32{0} ** memory_size;
     var index: u32 = 0;
     var program_counter: u32 = 0;
@@ -45,14 +43,14 @@ pub fn interpret(program: []const u8) anyerror!void {
         switch(character) {
             '>' => {
                 if (index == memory_size - 1) {
-                    try stderr.print("Error: index out of upper bounds at char {d}\n", .{ program_counter });
+                    try error_writer.print("Error: index out of upper bounds at char {d}\n", .{ program_counter });
                     return error.IndexOutOfBounds;
                 }
                 index += 1;
             },
             '<' => {
                 if (index == 0) {
-                    try stderr.print("Error: index out of lower bounds at char {d}\n", .{ program_counter });
+                    try error_writer.print("Error: index out of lower bounds at char {d}\n", .{ program_counter });
                     return error.IndexOutOfBounds;
                 }
                 index -=1 ;
@@ -65,10 +63,10 @@ pub fn interpret(program: []const u8) anyerror!void {
             },
             '.' => {
                 const out_byte = @truncate(u8, @bitCast(u32, memory[index]));
-                try stdout.writeByte(out_byte);
+                try writer.writeByte(out_byte);
             },
             ',' => {
-                memory[index] = stdin.readByte() catch 0;
+                memory[index] = reader.readByte() catch 0;
             },
             '[' => {
                 if (memory[index] == 0) {
@@ -88,7 +86,7 @@ pub fn interpret(program: []const u8) anyerror!void {
                         }
                     }
                     if (program_counter == program.len - 1 and depth != 0) {
-                        try stderr.print("Error: missing closing braket to opening bracket at char {d}\n", .{ start });
+                        try error_writer.print("Error: missing closing braket to opening bracket at char {d}\n", .{ start });
                         return error.MissingClosingBracket;
                     }
                 }
@@ -111,7 +109,7 @@ pub fn interpret(program: []const u8) anyerror!void {
                         }
                     }
                     if (program_counter == 0 and depth != 0) {
-                        try stderr.print("Error: missing opening bracket to closing bracket at char {d}\n", .{ start });
+                        try error_writer.print("Error: missing opening bracket to closing bracket at char {d}\n", .{ start });
                         return error.MissingOpeningBracket;
                     }
                 }
@@ -141,42 +139,72 @@ test "get cell bit width brainfuck" {
         \\ [-]>[-]++++[-<++++++++>]<.[->+++<]>++.+++++++.+++++++++++.[----<+>]<+++.
         \\ +[->+++<]>.++.+++++++..+++++++.[-]++++++++++.[-]<
     ;
-    std.debug.print("\n", .{});
-    try interpret(program);
+    var output = std.ArrayList(u8).init(std.testing.allocator);
+    defer output.deinit();
+
+    const stdin = std.io.getStdIn().reader();
+    const stdout = output.writer();
+    const stderr = std.io.null_writer;
+
+    try interpret(program, stdin, stdout, stderr);
+
+    try std.testing.expectEqualStrings("32 bit cells\n", output.items);
 }
 
 test "write in cell outside of array bottom" {
     const program = "<<<+";
-    const output = interpret(program);
+    const stdin = std.io.getStdIn().reader();
+    const stdout = std.io.null_writer;
+    const stderr = std.io.null_writer;
+
+    const output = interpret(program, stdin, stdout, stderr);
     try testing.expectError(error.IndexOutOfBounds, output);
 }
 
 test "write in cell outside of array top" {
     const program = ">" ** memory_size;
-    const output = interpret(program);
+    const stdin = std.io.getStdIn().reader();
+    const stdout = std.io.null_writer;
+    const stderr = std.io.null_writer;
+
+    const output = interpret(program, stdin, stdout, stderr);
     try testing.expectError(error.IndexOutOfBounds, output);
 }
 
-test "write number over 255 to stdout" {
+test "write number over 255 to writer" {
     const program = "+" ** 300 ++ ".";
-    try interpret(program);
-    std.debug.print("\n", .{});
+    const stdin = std.io.getStdIn().reader();
+    const stdout = std.io.null_writer;
+    const stderr = std.io.null_writer;
+
+    try interpret(program, stdin, stdout, stderr);
 }
 
-test "write negative number to stdout" {
+test "write negative number to writer" {
     const program = "-" ** 200 ++ ".";
-    try interpret(program);
-    std.debug.print("\n", .{});
+    const stdin = std.io.getStdIn().reader();
+    const stdout = std.io.null_writer;
+    const stderr = std.io.null_writer;
+
+    try interpret(program, stdin, stdout, stderr);
 }
 
 test "loop without end" {
     const program = "[><";
-    const output = interpret(program);
+    const stdin = std.io.getStdIn().reader();
+    const stdout = std.io.null_writer;
+    const stderr = std.io.null_writer;
+
+    const output = interpret(program, stdin, stdout, stderr);
     try testing.expectError(error.MissingClosingBracket, output);
 }
 
 test "loop without beginning" {
     const program = "+><]";
-    const output = interpret(program);
+    const stdin = std.io.getStdIn().reader();
+    const stdout = std.io.null_writer;
+    const stderr = std.io.null_writer;
+
+    const output = interpret(program, stdin, stdout, stderr);
     try testing.expectError(error.MissingOpeningBracket, output);
 }
