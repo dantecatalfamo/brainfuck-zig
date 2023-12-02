@@ -24,7 +24,7 @@ pub fn main() anyerror!void {
     } else if (args.len == 2) {
         const file_path = args[1];
         const program = std.fs.cwd().readFileAlloc(allocator, file_path, max_file_size) catch {
-            try stderr.print("File not found: {s}\n", .{ file_path });
+            try stderr.print("File not found: {s}\n", .{file_path});
             std.os.exit(1);
         };
         defer allocator.free(program);
@@ -38,22 +38,22 @@ pub fn interpret(program: []const u8, reader: anytype, writer: anytype, error_wr
     var program_counter: u32 = 0;
 
     while (program_counter < program.len) {
-        var character = program[program_counter];
+        const character = program[program_counter];
 
-        switch(character) {
+        switch (character) {
             '>' => {
                 if (index == memory_size - 1) {
-                    try error_writer.print("Error: index out of upper bounds at char {d}\n", .{ program_counter });
+                    try error_writer.print("Error: index out of upper bounds at char {d}\n", .{program_counter});
                     return error.IndexOutOfBounds;
                 }
                 index += 1;
             },
             '<' => {
                 if (index == 0) {
-                    try error_writer.print("Error: index out of lower bounds at char {d}\n", .{ program_counter });
+                    try error_writer.print("Error: index out of lower bounds at char {d}\n", .{program_counter});
                     return error.IndexOutOfBounds;
                 }
-                index -=1 ;
+                index -= 1;
             },
             '+' => {
                 memory[index] +%= 1;
@@ -62,7 +62,7 @@ pub fn interpret(program: []const u8, reader: anytype, writer: anytype, error_wr
                 memory[index] -%= 1;
             },
             '.' => {
-                const out_byte = @truncate(u8, @bitCast(u32, memory[index]));
+                const out_byte: u8 = @truncate(@as(u32, @bitCast(memory[index])));
                 try writer.writeByte(out_byte);
             },
             ',' => {
@@ -86,7 +86,7 @@ pub fn interpret(program: []const u8, reader: anytype, writer: anytype, error_wr
                         }
                     }
                     if (program_counter == program.len - 1 and depth != 0) {
-                        try error_writer.print("Error: missing closing braket to opening bracket at char {d}\n", .{ start });
+                        try error_writer.print("Error: missing closing braket to opening bracket at char {d}\n", .{start});
                         return error.MissingClosingBracket;
                     }
                 }
@@ -109,12 +109,12 @@ pub fn interpret(program: []const u8, reader: anytype, writer: anytype, error_wr
                         }
                     }
                     if (program_counter == 0 and depth != 0) {
-                        try error_writer.print("Error: missing opening bracket to closing bracket at char {d}\n", .{ start });
+                        try error_writer.print("Error: missing opening bracket to closing bracket at char {d}\n", .{start});
                         return error.MissingOpeningBracket;
                     }
                 }
             },
-            else => { }
+            else => {},
         }
         program_counter += 1;
     }
